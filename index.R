@@ -1,0 +1,134 @@
+setwd("C:/Users/idapo/OneDrive/Työpöytä/RNA_seq_DEA")
+Coinfection.targets<-read.delim("./data/fileDesc.txt")
+rownames(Coinfection.targets)<-c("Ha1","Ha2","Ha3","Ctr1","Ctr2","Ctr3")
+library(edgeR)
+Coinfection.orig <- readDGE(Coinfection.targets, header=F)
+dim(Coinfection.orig)
+head(Coinfection.orig)
+Coinfection.rawCount <- Coinfection.orig$count
+dim(Coinfection.rawCount)
+head(Coinfection.rawCount)
+sampletype <- factor(c(rep("Ha",3), rep("Ctr", 3)))
+meta <- data.frame(sampletype, row.names = colnames(Coinfection.orig$count))
+colnames(Coinfection.orig$count)
+rownames(meta)
+all(colnames(Coinfection.orig$count) %in% rownames(meta))
+library(DESeq2)
+dds <- DESeqDataSetFromMatrix(Coinfection.orig, colData = meta, design = ~ sampletype)
+head(counts(dds))
+dds <- estimateSizeFactors(dds)
+sizeFactors(dds)
+normalized_counts <- counts(dds, normalized=TRUE)
+write.csv(normalized_counts, file="./results/coinfection_normalized_counts_DESeq2.csv")
+
+rld <- rlog(dds, blind=TRUE)
+plotPCA(rld, intgroup="sampletype")
+pdf("./results/PlotPCA_dds.pdf")
+plotPCA(rld, intgroup="sampletype")
+dev.off()
+
+rld_mat <- assay(rld)
+rld_cor <- cor(rld_mat) 
+head(rld_cor)
+head(meta)
+
+library(pheatmap)
+heat.colors <- RColorBrewer::brewer.pal(6, "Blues")
+pheatmap(rld_cor, annotation = meta, color = heat.colors, border_color=NA, fontsize = 10, 
+         fontsize_row = 10, height=20)
+pdf("./results/PlotHeatmap_dds.pdf")
+heat.colors <- RColorBrewer::brewer.pal(6, "Blues")
+pheatmap(rld_cor, annotation = meta, color = heat.colors, border_color=NA, fontsize = 10, 
+         fontsize_row = 10, height=20)
+library(edgeR)
+options(digits=3)
+infection.targets<-read.delim("./data/fileDesc.txt")
+infection.targets
+rownames(infection.targets)<-c("Ha1","Ha2","Ha3","Ctr1","Ctr2","Ctr3")
+infection.targets
+infection <- readDGE(infection.targets, header=F)
+dim(infection)
+
+head(infection)
+infection.rawCount <- infection$count
+head(infection.rawCount)
+library(ggplot2)
+ggplot(infection.rawCount) +
+  geom_histogram(aes(x = Ha1), stat = "bin", bins = 200) +
+  xlab("Raw expression counts") +
+  ylab("Number of genes")
+png("./results/count distribution.png", res=300, height=1800, width=1800)
+ggplot(infection.rawCount) +
+  geom_histogram(aes(x = Ha1), stat = "bin", bins = 200) +
+  xlab("Raw expression counts") +
+  ylab("Number of genes")
+dev.off()
+write.csv(infection.rawCount, file="./results/infection.rawCounts.csv")
+infection.normCPM <- cpm(calcNormFactors(infection))
+dim(infection.normCPM)
+head(infection.normCPM)
+write.csv(infection.normCPM, file="./results/infection.normCPM.csv")
+infection.filtered <- rowSums(cpm(infection)>1) >=3
+table(infection.filtered)
+infection$samples$lib.size
+Infection <- infection[infection.filtered,]
+colSums(Infection$counts)
+dim(Infection)
+Infection$samples$lib.size <- colSums(Infection$counts)
+Infection$samples
+Infection = calcNormFactors(Infection)
+Infection$samples
+Infection.filtered.normCPM <-cpm(calcNormFactors(Infection))
+write.csv(Infection.filtered.normCPM, file="./results/Infection.filtered.normCPM.csv")
+group<-factor(c('Ha','Ha','Ha',"Ctr","Ctr","Ctr"))
+Infection.design <- model.matrix(~group)   
+rownames(Infection.design)<-colnames(Infection$counts)
+Infection.design
+plotMDS(Infection, main="MDS plot of RNA-Seq", labels=colnames(Infection$counts))
+png("./results/plotMDS.Infection.png", res=300, height=1800, width=1800)
+plotMDS(Infection, main="MDS plot of Infection RNA-Seq", labels=colnames(Infection$counts))
+dev.off()
+
+Infection <- estimateGLMCommonDisp(Infection, Infection.design)
+Infection <- estimateGLMTrendedDisp(Infection, Infection.design)
+Infection <- estimateGLMTagwiseDisp(Infection, Infection.design)
+plotMeanVar(Infection, show.tagwise.vars=T,NBline=T)
+
+Infection.fit <- glmFit(Infection, Infection.design)
+colnames(Infection.fit)
+lrt.Ha_vs_Ctr <- glmLRT(Infection.fit, coef=2)  # to compare Ha vs Ctr (Ha_vs_Ctr)
+
+t1<-topTags(lrt.Ha_vs_Ctr, n=nrow(Infection))
+head(t1$table)
+summary(decideTests(lrt.Ha_vs_Ctr, adjust.method="BH", p.value=0.05))
+nrow(subset(topTags(lrt.Ha_vs_Ctr, n=586)$table,  logFC > 0))
+lrt.Ha_vs_Ctr_UP <- subset(topTags(lrt.Ha_vs_Ctr, n=586)$table, logFC > 0)
+nrow(subset(topTags(lrt.Ha_vs_Ctr, n=586)$table,  logFC < 0))
+lrt.Ha_vs_Ctr_DW <- subset(topTags(lrt.Ha_vs_Ctr, n=586)$table, logFC < 0)
+DEtags.lrt.Ha_vs_Ctr <- rownames(Infection)[as.logical(decideTests(lrt.Ha_vs_Ctr, adjust.method="BH", p.value=0.05))]
+
+write.csv(lrt.Ha_vs_Ctr_UP, file="./results/lrt.Ha_vs_Ctr_UP.csv")
+write.csv(lrt.Ha_vs_Ctr_DW, file="./results/lrt.Ha_vs_Ctr_DW.csv")
+
+Infection.colHavsCtr = rep('grey55', nrow(Infection))
+
+Infection.colHavsCtr[lrt.Ha_vs_Ctr$table$PValue < 0.05 & lrt.Ha_vs_Ctr$table$logFC >0 ] <- "red"
+Infection.colHavsCtr[lrt.Ha_vs_Ctr$table$PValue < 0.05 & lrt.Ha_vs_Ctr$table$logFC <0 ] <- "blue"
+
+par(omi=c(0.1,0.1,0.1,0.1), las=1, cex=0.5, mgp=c(3,1,0), cex.main=1.8, cex.lab=1.4, cex.axis=1.4)
+plotSmear(lrt.Ha_vs_Ctr, de.tags=DEtags.lrt.Ha_vs_Ctr, xlab="log-counts per million (logCPM)", ylab="log2-fold change (log2FC)", main="Ha infection compared to Control", pch=19, cex=0.4, smearWidth=0.5, panel.first=grid(), smooth.scatter=FALSE, ylim=c(-7,7), yaxs="i")
+abline(h=c(-1,1),col="dodgerblue")
+
+par(omi=c(0.1,0.1,0.1,0.1), las=1, cex=0.5, mgp=c(3,1,0), cex.main=1.8, cex.lab=1.4, cex.axis=1.4)
+plotSmear(lrt.Ha_vs_Ctr, xlab="log-counts per million (logCPM)", ylab="log2-fold change (log2FC)", main="a infection compared to Control", smearWidth=0.5, pch=21, cex=0.4, deCol="red", col=Infection.colHavsCtr, ylim=c(-7,7), yaxs="i")
+abline(h=c(-1,1),col="dodgerblue")
+
+png("./results/plotSmear.InfectionRNAseq.png", res=300, height=1800, width=1800)
+par(omi=c(0.1,0.1,0.1,0.1), las=1, cex=0.5, mgp=c(3,1,0), cex.main=1.8, cex.lab=1.4, cex.axis=1.4)
+plotSmear(lrt.Ha_vs_Ctr, xlab="log-counts per million (logCPM)", ylab="log2-fold change (log2FC)", main="Ha infection compared to Control", smearWidth=0.5, pch=21, cex=0.4, deCol="red", col=Infection.colHavsCtr, ylim=c(-7,7), yaxs="i")
+abline(h=c(-1,1),col="dodgerblue")
+dev.off()
+
+
+
+
