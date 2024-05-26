@@ -33,13 +33,17 @@ head(rld_cor)
 head(meta)
 
 library(pheatmap)
+pheatmap(rld_cor, annotation = meta)
+
 heat.colors <- RColorBrewer::brewer.pal(6, "Blues")
 pheatmap(rld_cor, annotation = meta, color = heat.colors, border_color=NA, fontsize = 10, 
          fontsize_row = 10, height=20)
+
 pdf("./results/PlotHeatmap_dds.pdf")
 heat.colors <- RColorBrewer::brewer.pal(6, "Blues")
 pheatmap(rld_cor, annotation = meta, color = heat.colors, border_color=NA, fontsize = 10, 
          fontsize_row = 10, height=20)
+
 library(edgeR)
 options(digits=3)
 infection.targets<-read.delim("./data/fileDesc.txt")
@@ -52,18 +56,25 @@ dim(infection)
 head(infection)
 infection.rawCount <- infection$count
 head(infection.rawCount)
+
 library(ggplot2)
+
 ggplot(infection.rawCount) +
   geom_histogram(aes(x = Ha1), stat = "bin", bins = 200) +
   xlab("Raw expression counts") +
   ylab("Number of genes")
+
 png("./results/count distribution.png", res=300, height=1800, width=1800)
+
 ggplot(infection.rawCount) +
   geom_histogram(aes(x = Ha1), stat = "bin", bins = 200) +
   xlab("Raw expression counts") +
   ylab("Number of genes")
+
 dev.off()
+
 write.csv(infection.rawCount, file="./results/infection.rawCounts.csv")
+
 infection.normCPM <- cpm(calcNormFactors(infection))
 dim(infection.normCPM)
 head(infection.normCPM)
